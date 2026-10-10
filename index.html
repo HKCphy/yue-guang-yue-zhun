@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2b6cb0" />
+  <meta name="description" content="輕鬆學發音／愈廣愈準——幫助新來港兒童練習廣東話發音" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>輕鬆學發音 · 愈廣愈準</title>
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="phone-shell" role="application" aria-label="輕鬆學發音 App">
+    <div class="status-bar">
+      <span id="status-time">--:--</span>
+      <div class="notch" aria-hidden="true"></div>
+      <span class="status-icons" aria-hidden="true">LTE ●●●</span>
+    </div>
+
+    <header class="app-header">
+      <h1>輕鬆學發音</h1>
+      <div class="sub">愈廣愈準 · 新來港兒童廣東話練習</div>
+    </header>
+
+    <main class="screens">
+      <!-- 首頁 -->
+      <section class="screen active" data-screen="home" aria-label="首頁">
+        <div class="hero">
+          <div class="hero-badge" aria-hidden="true">🗣️</div>
+          <h2>歡迎嚟到！</h2>
+          <p>專為新來港兒童設計嘅廣東話發音練習，聽、讀、揀，一步步愈講愈準。</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">我的進度</div>
+          <div class="stats-grid">
+            <div class="stat-box">
+              <div class="num" id="stat-words">0</div>
+              <div class="label">練習過詞語</div>
+            </div>
+            <div class="stat-box">
+              <div class="num" id="stat-attempts">0</div>
+              <div class="label">總練習次數</div>
+            </div>
+            <div class="stat-box">
+              <div class="num" id="stat-rate">0%</div>
+              <div class="label">正確率</div>
+            </div>
+          </div>
+          <p class="welcome-note" id="last-session">尚未開始練習——撳下面開始啦！</p>
+        </div>
+
+        <button type="button" class="btn btn-primary" id="btn-start" style="margin-bottom:12px;">
+          ▶️ 開始練習
+        </button>
+
+        <div class="card">
+          <div class="card-title">關於本 App</div>
+          <p style="font-size:0.85rem;line-height:1.5;color:var(--text-muted);">
+            由教師設計，針對普通話背景同學常見難點：聲調、ng- 聲母、n-/l-、gw-/kw-、入聲同校園用語。
+            進度保存在本機瀏覽器（localStorage），可匯出 JSON。
+          </p>
+          <div class="btn-row">
+            <button type="button" class="btn btn-outline btn-sm" id="btn-export">匯出進度</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-reset">清除進度</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 目錄 -->
+      <section class="screen" data-screen="catalog" aria-label="目錄">
+        <p class="section-label">選擇單元開始練習</p>
+        <div class="cat-list" id="catalog-list"></div>
+      </section>
+
+      <!-- 練習 -->
+      <section class="screen" data-screen="practice" aria-label="練習">
+        <div class="cat-picker">
+          <label for="practice-cat" class="section-label" style="display:block;">練習單元</label>
+          <select id="practice-cat" aria-label="選擇練習單元"></select>
+        </div>
+
+        <div class="practice-toolbar" role="tablist" aria-label="練習模式">
+          <button type="button" class="mode-chip active" data-mode="listen" role="tab">🔊 聽</button>
+          <button type="button" class="mode-chip" data-mode="read" role="tab">🎤 讀</button>
+          <button type="button" class="mode-chip" data-mode="choice" role="tab">🔤 揀粵拼</button>
+          <button type="button" class="mode-chip" data-mode="tone" role="tab">🎵 聲調</button>
+        </div>
+
+        <div class="progress-bar-wrap" aria-hidden="true">
+          <div class="progress-bar-fill" id="practice-progress-fill"></div>
+        </div>
+        <p class="progress-label" id="practice-progress-label">第 1 / 1 個</p>
+
+        <div class="practice-card" id="practice-card"></div>
+      </section>
+
+      <!-- 提示 -->
+      <section class="screen" data-screen="tips" aria-label="提示">
+        <p class="tip-intro">
+          以下提示畀新來港兒童、家長同老師參考——每日小步練習，口音會自然改善。
+        </p>
+        <div id="tips-list"></div>
+        <div class="card" style="margin-top:8px;">
+          <div class="card-title">粵拼小知識</div>
+          <p style="font-size:0.85rem;line-height:1.55;color:var(--text-muted);">
+            粵拼（Jyutping）係語言學會拼音方案。數字 1–6 代表聲調，例如
+            <strong>ngo5</strong>＝「我」（第 5 聲）。入聲字以 -p/-t/-k 結尾，讀音短促。
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <nav class="tab-bar" aria-label="主導航">
+      <button type="button" class="tab-btn active" data-screen="home">
+        <span class="tab-icon">🏠</span>
+        <span>首頁</span>
+      </button>
+      <button type="button" class="tab-btn" data-screen="catalog">
+        <span class="tab-icon">📚</span>
+        <span>目錄</span>
+      </button>
+      <button type="button" class="tab-btn" data-screen="practice">
+        <span class="tab-icon">✏️</span>
+        <span>練習</span>
+      </button>
+      <button type="button" class="tab-btn" data-screen="tips">
+        <span class="tab-icon">💡</span>
+        <span>提示</span>
+      </button>
+    </nav>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
