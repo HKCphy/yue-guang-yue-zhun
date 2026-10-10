@@ -1,6 +1,6 @@
 /**
  * AuthService — 電郵＋密碼帳戶
- * Mock：localStorage；可切換到 Supabase（見 supabase-config.js）
+ * Mock：localStorage；Supabase：Auth + profiles 表
  */
 (function (global) {
   "use strict";
@@ -37,6 +37,29 @@
 
   function normalizeEmail(email) {
     return String(email || "").trim().toLowerCase();
+  }
+
+  function publicUser(u) {
+    return {
+      id: u.id,
+      email: u.email,
+      role: u.role,
+      display_name: u.display_name,
+      link_code: u.link_code,
+      created_at: u.created_at,
+    };
+  }
+
+  function profileToUser(p, fallbackEmail) {
+    if (!p) return null;
+    return {
+      id: p.id,
+      email: p.email || fallbackEmail || "",
+      role: p.role || "學生",
+      display_name: p.display_name || (p.email || fallbackEmail || "").split("@")[0],
+      link_code: p.link_code || "",
+      created_at: p.created_at,
+    };
   }
 
   /* —— Mock 實作 —— */
@@ -130,18 +153,7 @@
     },
   };
 
-  function publicUser(u) {
-    return {
-      id: u.id,
-      email: u.email,
-      role: u.role,
-      display_name: u.display_name,
-      link_code: u.link_code,
-      created_at: u.created_at,
-    };
-  }
-
-  /* —— Supabase stub（填好 config 後啟用） —— */
+  /* —— Supabase —— */
   var SupabaseAuth = {
     _client: null,
     _getClient: function () {
@@ -149,32 +161,54 @@
       if (!global.supabase || !global.supabase.createClient) {
         throw new Error("請先喺 index.html 載入 @supabase/supabase-js CDN");
       }
+      if (!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY) {
+        throw new Error("請喺 supabase-config.js 填 SUPABASE_URL 同 SUPABASE_ANON_KEY");
+      }
       this._client = global.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
       return this._client;
     },
+
     async register(email, password, role, displayName) {
+      email = normalizeEmail(email);
+      if (!email || !password) throw new Error("請填電郵同密碼");
+      if (password.length < 6) throw new Error("密碼至少 6 個字元");
+      if (ROLES.indexOf(role) === -1) throw new Error("請選擇角色");
+      var name = (displayName || email.split("@")[0]).trim();
       var client = this._getClient();
       var res = await client.auth.signUp({
-        email: normalizeEmail(email),
+        email: email,
         password: password,
         options: {
-          data: { role: role, display_name: displayName || email.split("@")[0] },
+          data: { role: role, display_name: name },
         },
       });
       if (res.error) throw new Error(res.error.message);
-      // 同時寫入 profiles 表（需 RLS／trigger，見 README）
       var user = res.data.user;
       if (user) {
-        await client.from("profiles").upsert({
-          id: user.id,
-          email: normalizeEmail(email),
-          role: role,
-          display_name: displayName || email.split("@")[0],
-        });
+        // trigger 會建 profile；再 upsert 確保角色／名稱（需 profiles INSERT policy）
+        var up = await client.from("profiles").upsert(
+          {
+            id: user.id,
+            email: email,
+            role: role,
+            display_name: name,
+          },
+          { onConflict: "id" }
+        );
+        if (up.error) {
+          // trigger 可能已建好；忽略 unique 衝突以外嘅提示，之後 getSession 再讀
+          console.warn("profiles upsert:", up.error.message);
+        }
+      }
+      // 若開咗電郵確認，signUp 後 session 會係 null
+      if (!res.data.session) {
+        return null; // 呼叫端顯示「請檢查電郵確認」
       }
       return this.getSession();
     },
+
     async login(email, password) {
+      if (!password || password.length < 6) throw new Error("密碼至少 6 個字元");
       var client = this._getClient();
       var res = await client.auth.signInWithPassword({
         email: normalizeEmail(email),
@@ -183,44 +217,93 @@
       if (res.error) throw new Error(res.error.message);
       return this.getSession();
     },
+
     async logout() {
       var client = this._getClient();
       await client.auth.signOut();
     },
+
     getSession: async function () {
       var client = this._getClient();
       var sess = await client.auth.getSession();
       var user = sess.data && sess.data.session && sess.data.session.user;
       if (!user) return null;
-      var prof = await client.from("profiles").select("*").eq("id", user.id).single();
-      var p = prof.data || {};
-      return {
-        id: user.id,
-        email: user.email,
-        role: p.role || (user.user_metadata && user.user_metadata.role) || "學生",
-        display_name: p.display_name || (user.user_metadata && user.user_metadata.display_name) || user.email,
-        link_code: p.link_code || "",
-        created_at: p.created_at || user.created_at,
-      };
+      var prof = await client.from("profiles").select("*").eq("id", user.id).maybeSingle();
+      if (prof.error) {
+        console.warn("profiles select:", prof.error.message);
+      }
+      var p = prof.data;
+      if (!p) {
+        // profile 未建好時用 metadata 頂住，並嘗試 upsert
+        var meta = user.user_metadata || {};
+        var fallback = {
+          id: user.id,
+          email: user.email,
+          role: meta.role || "學生",
+          display_name: meta.display_name || (user.email || "").split("@")[0],
+        };
+        await client.from("profiles").upsert(fallback, { onConflict: "id" });
+        var again = await client.from("profiles").select("*").eq("id", user.id).maybeSingle();
+        p = again.data || fallback;
+      }
+      return profileToUser(p, user.email);
     },
+
     async updateProfile(patch) {
       var cur = await this.getSession();
       if (!cur) throw new Error("未登入");
       var client = this._getClient();
-      var res = await client.from("profiles").update(patch).eq("id", cur.id);
+      var allowed = {};
+      if (patch.display_name) allowed.display_name = String(patch.display_name).trim();
+      var res = await client.from("profiles").update(allowed).eq("id", cur.id);
       if (res.error) throw new Error(res.error.message);
       return this.getSession();
     },
-    findByEmail: async function () { throw new Error("請用 Supabase query 實作"); },
-    findByLinkCode: async function () { throw new Error("請用 Supabase query 實作"); },
-    findById: async function () { throw new Error("請用 Supabase query 實作"); },
-    listUsers: function () { return []; },
+
+    findByEmail: async function (email) {
+      var client = this._getClient();
+      var res = await client
+        .from("profiles")
+        .select("*")
+        .eq("email", normalizeEmail(email))
+        .maybeSingle();
+      if (res.error) throw new Error(res.error.message);
+      return profileToUser(res.data);
+    },
+
+    findByLinkCode: async function (code) {
+      code = String(code || "").trim().toUpperCase();
+      if (!code) return null;
+      var client = this._getClient();
+      var res = await client
+        .from("profiles")
+        .select("*")
+        .eq("link_code", code)
+        .eq("role", "學生")
+        .maybeSingle();
+      if (res.error) throw new Error(res.error.message);
+      return profileToUser(res.data);
+    },
+
+    findById: async function (id) {
+      if (!id) return null;
+      var client = this._getClient();
+      var res = await client.from("profiles").select("*").eq("id", id).maybeSingle();
+      if (res.error) throw new Error(res.error.message);
+      return profileToUser(res.data);
+    },
+
+    listUsers: async function () {
+      var client = this._getClient();
+      var res = await client.from("profiles").select("*").limit(200);
+      if (res.error) throw new Error(res.error.message);
+      return (res.data || []).map(function (p) { return profileToUser(p); });
+    },
   };
 
   var mode = (CFG.AUTH_MODE || "mock").toLowerCase();
   var impl = mode === "supabase" ? SupabaseAuth : MockAuth;
 
-  // getSession 喺 mock 係同步；supabase 係 async —— 統一包一層
   var AuthService = {
     ROLES: ROLES,
     mode: mode,
@@ -237,8 +320,12 @@
       return Promise.resolve(impl.getSession());
     },
     getSessionSync: function () {
-      // 只供 mock 即時 UI；supabase 模式請用 getSession()
+      // 只供 mock 即時 UI；supabase 模式請 await getSession()
       if (mode === "mock") return MockAuth.getSession();
+      return null;
+    },
+    getClient: function () {
+      if (mode === "supabase") return SupabaseAuth._getClient();
       return null;
     },
     updateProfile: function (patch) {

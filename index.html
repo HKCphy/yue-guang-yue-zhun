@@ -31,7 +31,7 @@
           <div class="hero" style="padding-top:8px;">
             <div class="hero-badge" aria-hidden="true">🗣️</div>
             <h2 id="auth-title">登入</h2>
-            <p id="auth-desc">電郵＋密碼。演示模式資料存在本機瀏覽器。</p>
+            <p id="auth-desc">電郵＋密碼登入帳戶。</p>
           </div>
 
           <div class="auth-tabs" role="tablist">
@@ -44,7 +44,7 @@
             <input id="auth-email" type="email" class="field-input" placeholder="student@example.com" required />
 
             <label class="field-label" for="auth-password">密碼</label>
-            <input id="auth-password" type="password" class="field-input" placeholder="至少 4 個字元" required minlength="4" />
+            <input id="auth-password" type="password" class="field-input" placeholder="至少 6 個字元" required minlength="6" />
 
             <div id="register-fields" class="hidden">
               <label class="field-label" for="auth-name">顯示名稱</label>
@@ -62,7 +62,7 @@
             <button type="submit" class="btn btn-primary" id="auth-submit" style="margin-top:12px;">登入</button>
           </form>
 
-          <p class="welcome-note">Mock 模式：唔使開伺服器都可註冊三種角色試用。<br/>接 Supabase 步驟見 README。</p>
+          <p class="welcome-note" id="auth-welcome-note">註冊學生／家長／言語治療師帳戶後即可練習同睇進度。</p>
         </div>
       </section>
 
@@ -244,8 +244,7 @@
     </nav>
   </div>
 
-  <!-- 切換到 supabase 時取消註解下一行 -->
-  <!-- <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
   <script src="js/data.js"></script>
   <script src="js/auth.js"></script>

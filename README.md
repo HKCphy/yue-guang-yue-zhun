@@ -3,7 +3,7 @@
 幫助**新來港兒童**練習**廣東話（粵語）發音**嘅手機風格網頁 App。  
 支援**帳戶角色**（言語治療師／家長／學生）、**情景對話**、**睇文字錄音測驗**。
 
-純靜態 HTML／CSS／JS，**唔使 npm build**。預設 **Mock 模式**（localStorage + IndexedDB）即可演示；之後可接免費 **Supabase** 做真後端。
+純靜態 HTML／CSS／JS，**唔使 npm build**。可用 **Mock**（本機）或 **Supabase**（雲端帳戶＋進度）。`AUTH_MODE` 喺 `js/supabase-config.js`。
 
 線上示範（GitHub Pages）：<https://hkcphy.github.io/yue-guang-yue-zhun/>  
 Repo：<https://github.com/HKCphy/yue-guang-yue-zhun>
@@ -41,7 +41,7 @@ python3 -m http.server 8080
 
 ## Mock 帳戶點用（而家就可以試）
 
-預設 `js/supabase-config.js` 入面 `AUTH_MODE: "mock"`。
+若 `AUTH_MODE: "mock"`（本機演示）：
 
 ### 演示三種角色
 
@@ -118,7 +118,7 @@ window.SUPABASE_CONFIG = {
 };
 ```
 
-喺 `index.html` **取消註解** CDN：
+喺 `index.html` 確認已載入 CDN（應喺 `supabase-config.js` 之前）：
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -126,95 +126,14 @@ window.SUPABASE_CONFIG = {
 
 ### 3. SQL Schema（喺 SQL Editor 貼上執行）
 
-```sql
--- 角色枚舉
-create type public.user_role as enum ('言語治療師', '家長', '學生');
+打開專案根目錄嘅 **`supabase-schema.sql`**，全選複製，貼去 Supabase → **SQL Editor** → Run。
 
-create table public.profiles (
-  id uuid primary key references auth.users on delete cascade,
-  email text unique not null,
-  role public.user_role not null default '學生',
-  display_name text,
-  link_code text unique default upper(substr(md5(random()::text), 1, 6)),
-  created_at timestamptz default now()
-);
+內容包括：`profiles` / `links` / `attempts` / `therapist_notes`、註冊 trigger、RLS（含 **profiles INSERT own**：`auth.uid() = id`）。  
+Trigger 用 `execute function`（適合現時 Supabase Postgres）。
 
-create table public.links (
-  id uuid primary key default gen_random_uuid(),
-  therapist_id uuid references public.profiles(id) on delete cascade,
-  parent_id uuid references public.profiles(id) on delete cascade,
-  student_id uuid not null references public.profiles(id) on delete cascade,
-  created_at timestamptz default now(),
-  check (therapist_id is not null or parent_id is not null)
-);
+**建議同時**：Authentication → Providers → Email → 關閉 **Confirm email**（否則註冊後要先收確認信先可以登入；開發階段關咗較方便）。
 
-create table public.attempts (
-  id uuid primary key default gen_random_uuid(),
-  student_id uuid not null references public.profiles(id) on delete cascade,
-  unit text,
-  word text,
-  mode text,
-  correct boolean default false,
-  score numeric default 0,
-  meta jsonb,
-  created_at timestamptz default now()
-);
-
-create table public.therapist_notes (
-  id uuid primary key default gen_random_uuid(),
-  therapist_id uuid not null references public.profiles(id) on delete cascade,
-  student_id uuid not null references public.profiles(id) on delete cascade,
-  body text,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now(),
-  unique (therapist_id, student_id)
-);
-
--- 註冊後自動建 profile（可按需要改）
-create or replace function public.handle_new_user()
-returns trigger language plpgsql security definer as $$
-begin
-  insert into public.profiles (id, email, role, display_name)
-  values (
-    new.id,
-    new.email,
-    coalesce((new.raw_user_meta_data->>'role')::public.user_role, '學生'),
-    coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1))
-  );
-  return new;
-end;
-$$;
-
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
-
--- 簡易 RLS（之後可收緊）
-alter table public.profiles enable row level security;
-alter table public.links enable row level security;
-alter table public.attempts enable row level security;
-alter table public.therapist_notes enable row level security;
-
-create policy "profiles read own or linked"
-  on public.profiles for select using (true); -- 演示用；正式請收窄
-
-create policy "profiles update own"
-  on public.profiles for update using (auth.uid() = id);
-
-create policy "attempts insert own"
-  on public.attempts for insert with check (auth.uid() = student_id);
-
-create policy "attempts read"
-  on public.attempts for select using (true); -- 演示用
-
-create policy "links all authenticated"
-  on public.links for all using (auth.role() = 'authenticated');
-
-create policy "notes therapist"
-  on public.therapist_notes for all using (auth.uid() = therapist_id);
-```
-
-> 錄音檔建議改放 **Supabase Storage** bucket（例如 `recordings`），本版 Mock 用 IndexedDB。
+> **錄音**：練習／測驗音檔暫存瀏覽器 **IndexedDB**（唔上傳 Storage）。測驗結果同進度（attempts）會寫入 Supabase。之後可加 Storage bucket `recordings`。
 
 ### 4. 重新部署 GitHub Pages
 
@@ -226,7 +145,7 @@ git push
 
 Pages 會自動更新（或等一兩分鐘）。
 
-`js/auth.js` 已有 Supabase 註冊／登入 stub；`DataService` 仍以 Mock 為主——接真 DB 時可將 `db.js` 各方法改做 `supabase.from(...).select/insert`。
+`js/auth.js` 同 `js/db.js` 已接好 Supabase（profiles／links／attempts／therapist_notes）。錄音 blob 仍用本機 IndexedDB。
 
 ---
 
@@ -237,12 +156,13 @@ cantonese-app/
 ├── index.html
 ├── css/styles.css
 ├── js/
-│   ├── supabase-config.js   # AUTH_MODE + URL/key
+│   ├── supabase-config.js   # AUTH_MODE + URL/anon key
 │   ├── auth.js              # AuthService（mock | supabase）
-│   ├── db.js                # DataService（links/attempts/notes/recordings）
+│   ├── db.js                # DataService（Supabase 或 Mock）
 │   ├── data.js              # 單元、情景、測驗句子
 │   └── app.js               # UI 同流程
 ├── assets/icon.svg
+├── supabase-schema.sql      # 喺 SQL Editor 執行
 └── README.md
 ```
 

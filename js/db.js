@@ -1,10 +1,14 @@
 /**
  * DataService — 進度／連結／錄音 metadata
  * Mock：localStorage + IndexedDB（錄音 blob）
- * 之後可換成 Supabase tables（見 README schema）
+ * Supabase：links / attempts / therapist_notes；錄音仍用本機 IndexedDB
  */
 (function (global) {
   "use strict";
+
+  var CFG = global.SUPABASE_CONFIG || { AUTH_MODE: "mock" };
+  var mode = (CFG.AUTH_MODE || "mock").toLowerCase();
+  var isSb = mode === "supabase";
 
   var LINKS_KEY = "yue_links_v1";
   var ATTEMPTS_KEY = "yue_attempts_v1";
@@ -30,6 +34,17 @@
 
   function id() {
     return "r_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7);
+  }
+
+  function getClient() {
+    if (global.AuthService && typeof global.AuthService.getClient === "function") {
+      var c = global.AuthService.getClient();
+      if (c) return c;
+    }
+    if (!global.supabase || !global.supabase.createClient) {
+      throw new Error("請先載入 @supabase/supabase-js");
+    }
+    return global.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
   }
 
   /* —— IndexedDB for recordings —— */
@@ -72,21 +87,32 @@
   }
 
   var DataService = {
-    /**
-     * profiles 由 AuthService 管理
-     * links: { id, therapist_id?, parent_id?, student_id, created_at }
-     * attempts: { id, student_id, unit, word, mode, correct, score, note?, created_at }
-     * notes: { id, therapist_id, student_id, body, created_at, updated_at }
-     * recordings: IndexedDB { id, attempt_id, student_id, mime, blob, created_at }
-     */
+    mode: mode,
 
     /* —— Links —— */
-    linkTherapistToStudent: function (therapistId, studentId) {
+    linkTherapistToStudent: async function (therapistId, studentId) {
+      if (isSb) {
+        var client = getClient();
+        var existing = await client
+          .from("links")
+          .select("id")
+          .eq("therapist_id", therapistId)
+          .eq("student_id", studentId)
+          .maybeSingle();
+        if (existing.data) return null;
+        var res = await client
+          .from("links")
+          .insert({ therapist_id: therapistId, parent_id: null, student_id: studentId })
+          .select()
+          .single();
+        if (res.error) throw new Error(res.error.message);
+        return res.data;
+      }
       var links = load(LINKS_KEY);
       var exists = links.some(function (l) {
         return l.therapist_id === therapistId && l.student_id === studentId;
       });
-      if (exists) return Promise.resolve(null);
+      if (exists) return null;
       var row = {
         id: id(),
         therapist_id: therapistId,
@@ -96,15 +122,32 @@
       };
       links.push(row);
       save(LINKS_KEY, links);
-      return Promise.resolve(row);
+      return row;
     },
 
-    linkParentToStudent: function (parentId, studentId) {
+    linkParentToStudent: async function (parentId, studentId) {
+      if (isSb) {
+        var client = getClient();
+        var existing = await client
+          .from("links")
+          .select("id")
+          .eq("parent_id", parentId)
+          .eq("student_id", studentId)
+          .maybeSingle();
+        if (existing.data) return null;
+        var res = await client
+          .from("links")
+          .insert({ therapist_id: null, parent_id: parentId, student_id: studentId })
+          .select()
+          .single();
+        if (res.error) throw new Error(res.error.message);
+        return res.data;
+      }
       var links = load(LINKS_KEY);
       var exists = links.some(function (l) {
         return l.parent_id === parentId && l.student_id === studentId;
       });
-      if (exists) return Promise.resolve(null);
+      if (exists) return null;
       var row = {
         id: id(),
         therapist_id: null,
@@ -114,39 +157,79 @@
       };
       links.push(row);
       save(LINKS_KEY, links);
-      return Promise.resolve(row);
+      return row;
     },
 
-    getLinkedStudentIds: function (userId, role) {
+    getLinkedStudentIds: async function (userId, role) {
+      if (isSb) {
+        var client = getClient();
+        var q = client.from("links").select("student_id");
+        if (role === "言語治療師") q = q.eq("therapist_id", userId);
+        else if (role === "家長") q = q.eq("parent_id", userId);
+        else return [];
+        var res = await q;
+        if (res.error) throw new Error(res.error.message);
+        return (res.data || []).map(function (l) { return l.student_id; });
+      }
       var links = load(LINKS_KEY);
       var ids = [];
       links.forEach(function (l) {
         if (role === "言語治療師" && l.therapist_id === userId) ids.push(l.student_id);
         if (role === "家長" && l.parent_id === userId) ids.push(l.student_id);
       });
-      return Promise.resolve(ids);
+      return ids;
     },
 
-    unlink: function (linkId) {
+    unlink: async function (linkId) {
+      if (isSb) {
+        var client = getClient();
+        var res = await client.from("links").delete().eq("id", linkId);
+        if (res.error) throw new Error(res.error.message);
+        return true;
+      }
       var links = load(LINKS_KEY).filter(function (l) { return l.id !== linkId; });
       save(LINKS_KEY, links);
-      return Promise.resolve(true);
+      return true;
     },
 
-    getLinksForUser: function (userId, role) {
+    getLinksForUser: async function (userId, role) {
+      if (isSb) {
+        var client = getClient();
+        var q = client.from("links").select("*");
+        if (role === "言語治療師") q = q.eq("therapist_id", userId);
+        else if (role === "家長") q = q.eq("parent_id", userId);
+        else if (role === "學生") q = q.eq("student_id", userId);
+        else return [];
+        var res = await q;
+        if (res.error) throw new Error(res.error.message);
+        return res.data || [];
+      }
       var links = load(LINKS_KEY);
-      return Promise.resolve(
-        links.filter(function (l) {
-          if (role === "言語治療師") return l.therapist_id === userId;
-          if (role === "家長") return l.parent_id === userId;
-          if (role === "學生") return l.student_id === userId;
-          return false;
-        })
-      );
+      return links.filter(function (l) {
+        if (role === "言語治療師") return l.therapist_id === userId;
+        if (role === "家長") return l.parent_id === userId;
+        if (role === "學生") return l.student_id === userId;
+        return false;
+      });
     },
 
-    /* —— Attempts / practice_sessions —— */
-    recordAttempt: function (attempt) {
+    /* —— Attempts —— */
+    recordAttempt: async function (attempt) {
+      if (isSb) {
+        var client = getClient();
+        var payload = {
+          student_id: attempt.student_id,
+          unit: attempt.unit || "",
+          word: attempt.word || "",
+          mode: attempt.mode || "practice",
+          correct: !!attempt.correct,
+          score: typeof attempt.score === "number" ? attempt.score : attempt.correct ? 1 : 0,
+          meta: attempt.meta || null,
+        };
+        var res = await client.from("attempts").insert(payload).select().single();
+        if (res.error) throw new Error(res.error.message);
+        return res.data;
+      }
       var rows = load(ATTEMPTS_KEY);
       var row = {
         id: id(),
@@ -160,18 +243,28 @@
         created_at: new Date().toISOString(),
       };
       rows.push(row);
-      // 保底：最多留最近 2000 筆
       if (rows.length > 2000) rows = rows.slice(-2000);
       save(ATTEMPTS_KEY, rows);
-      return Promise.resolve(row);
+      return row;
     },
 
-    getAttemptsForStudent: function (studentId, limit) {
+    getAttemptsForStudent: async function (studentId, limit) {
       limit = limit || 200;
+      if (isSb) {
+        var client = getClient();
+        var res = await client
+          .from("attempts")
+          .select("*")
+          .eq("student_id", studentId)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        if (res.error) throw new Error(res.error.message);
+        return res.data || [];
+      }
       var rows = load(ATTEMPTS_KEY)
         .filter(function (a) { return a.student_id === studentId; })
         .sort(function (a, b) { return a.created_at < b.created_at ? 1 : -1; });
-      return Promise.resolve(rows.slice(0, limit));
+      return rows.slice(0, limit);
     },
 
     getAnalytics: function (studentId) {
@@ -207,7 +300,22 @@
     },
 
     /* —— Therapist notes —— */
-    saveNote: function (therapistId, studentId, body) {
+    saveNote: async function (therapistId, studentId, body) {
+      if (isSb) {
+        var client = getClient();
+        var now = new Date().toISOString();
+        var res = await client.from("therapist_notes").upsert(
+          {
+            therapist_id: therapistId,
+            student_id: studentId,
+            body: body,
+            updated_at: now,
+          },
+          { onConflict: "therapist_id,student_id" }
+        );
+        if (res.error) throw new Error(res.error.message);
+        return true;
+      }
       var notes = load(NOTES_KEY);
       var existing = notes.find(function (n) {
         return n.therapist_id === therapistId && n.student_id === studentId;
@@ -227,20 +335,30 @@
         });
       }
       save(NOTES_KEY, notes);
-      return Promise.resolve(true);
+      return true;
     },
 
-    getNote: function (therapistId, studentId) {
+    getNote: async function (therapistId, studentId) {
+      if (isSb) {
+        var client = getClient();
+        var res = await client
+          .from("therapist_notes")
+          .select("*")
+          .eq("therapist_id", therapistId)
+          .eq("student_id", studentId)
+          .maybeSingle();
+        if (res.error) throw new Error(res.error.message);
+        return res.data || null;
+      }
       var notes = load(NOTES_KEY);
       var n = notes.find(function (x) {
         return x.therapist_id === therapistId && x.student_id === studentId;
       });
-      return Promise.resolve(n || null);
+      return n || null;
     },
 
-    /* —— Recordings (blob in IndexedDB; metadata size note) —— */
+    /* —— Recordings：一律 IndexedDB（暫唔上傳 Storage） —— */
     saveRecording: async function (attemptId, studentId, blob, mime) {
-      // 注意：IndexedDB 有配額限制；長錄音可能失敗。演示用短句即可。
       var rid = id();
       await idbPut({
         id: rid,

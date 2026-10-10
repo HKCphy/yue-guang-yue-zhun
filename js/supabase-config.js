@@ -1,23 +1,10 @@
 /**
- * Supabase 設定（預留）
- * ------------------------------------------------------------
- * 預設 MODE 係 "mock"：帳戶同進度存在瀏覽器 localStorage／IndexedDB，
- * 唔使後端都可演示三種角色。
- *
- * 要接真後端：
- * 1. 去 https://supabase.com 開免費專案
- * 2. 喺 Project Settings → API 抄 Project URL 同 anon public key
- * 3. 填入下面 SUPABASE_URL、SUPABASE_ANON_KEY
- * 4. 將 AUTH_MODE 改做 "supabase"
- * 5. 喺 Supabase SQL Editor 執行 README 入面嘅 schema
- * 6. 重新部署到 GitHub Pages
- *
- * 可選：喺 index.html 加 CDN：
- *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
- * （supabase 模式先需要）
+ * Supabase 設定
+ * AUTH_MODE: "supabase" = 真後端；"mock" = 本機演示
+ * anon key 係公開用喺前端（靠 RLS 保護數據），唔好放 service_role key。
  */
 window.SUPABASE_CONFIG = {
-  AUTH_MODE: "mock", // "mock" | "supabase"
-  SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR_ANON_PUBLIC_KEY",
+  AUTH_MODE: "supabase",
+  SUPABASE_URL: 'https://pzhbrwjboldztsehqboi.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6aGJyd2pib2xkenRzZWhxYm9pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2MTAxNTcsImV4cCI6MjEwNzE4NjE1N30.DnMJu_HDua32XeVNDBUn_ijIjfEupcxpG0fyfzpOTz0',
 };

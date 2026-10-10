@@ -173,16 +173,33 @@
   /* —— Auth UI —— */
   function renderAuth() {
     var isReg = state.authTab === "register";
+    var isSb = Auth.mode === "supabase";
     $all(".auth-tab").forEach(function (t) {
       t.classList.toggle("active", t.dataset.authTab === state.authTab);
     });
     $("#register-fields").classList.toggle("hidden", !isReg);
     $("#auth-title").textContent = isReg ? "註冊" : "登入";
-    $("#auth-desc").textContent = isReg
-      ? "揀角色：學生／家長／言語治療師"
-      : "電郵＋密碼。演示模式資料存在本機瀏覽器。";
+    if (isReg) {
+      $("#auth-desc").textContent = "揀角色：學生／家長／言語治療師";
+    } else if (isSb) {
+      $("#auth-desc").textContent = "電郵＋密碼登入（雲端帳戶，進度可跨裝置共用）";
+    } else {
+      $("#auth-desc").textContent = "電郵＋密碼。演示模式資料存在本機瀏覽器。";
+    }
     $("#auth-submit").textContent = isReg ? "建立帳戶" : "登入";
     $("#auth-error").classList.add("hidden");
+    var pw = $("#auth-password");
+    if (pw) {
+      var minLen = isSb ? 6 : 4;
+      pw.minLength = minLen;
+      pw.placeholder = "至少 " + minLen + " 個字元";
+    }
+    var note = $("#auth-welcome-note");
+    if (note) {
+      note.innerHTML = isSb
+        ? "雲端帳戶：註冊後進度會存到 Supabase。<br/>若未收到確認電郵，可喺 Auth 設定關閉 Confirm email。"
+        : "Mock 模式：唔使開伺服器都可註冊三種角色試用。<br/>接 Supabase 步驟見 README。";
+    }
   }
 
   async function handleAuthSubmit(e) {
@@ -198,6 +215,13 @@
         var roleEl = document.querySelector('input[name="auth-role"]:checked');
         var role = roleEl ? roleEl.value : "學生";
         user = await Auth.register(email, password, role, name);
+        if (!user) {
+          // Supabase 開咗電郵確認：未有 session
+          showToast("註冊成功！請檢查電郵確認帳戶後再登入");
+          state.authTab = "login";
+          renderAuth();
+          return;
+        }
         showToast("註冊成功！");
       } else {
         user = await Auth.login(email, password);
@@ -971,11 +995,15 @@
       showToast("已登出");
     });
 
-    // 啟動：檢查 session
-    Auth.getSession().then(function (user) {
-      if (user) setLoggedInUI(user);
-      else setLoggedInUI(null);
-    });
+    // 啟動：await Auth.getSession()（supabase 同 mock 都係 Promise）
+    Auth.getSession()
+      .then(function (user) {
+        setLoggedInUI(user || null);
+      })
+      .catch(function (err) {
+        console.warn("session check failed", err);
+        setLoggedInUI(null);
+      });
   }
 
   if (document.readyState === "loading") {
