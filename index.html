@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#2b6cb0" />
-  <meta name="description" content="輕鬆學發音／愈廣愈準——幫助新來港兒童練習廣東話發音" />
+  <meta name="description" content="輕鬆學發音／愈廣愈準——幫助新來港兒童練習廣東話發音（帳戶＋情景＋錄音測驗）" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>輕鬆學發音 · 愈廣愈準</title>
@@ -19,121 +19,237 @@
       <span class="status-icons" aria-hidden="true">LTE ●●●</span>
     </div>
 
-    <header class="app-header">
+    <header class="app-header" id="app-header">
       <h1>輕鬆學發音</h1>
-      <div class="sub">愈廣愈準 · 新來港兒童廣東話練習</div>
+      <div class="sub" id="header-sub">愈廣愈準 · 新來港兒童廣東話練習</div>
     </header>
 
     <main class="screens">
-      <!-- 首頁 -->
-      <section class="screen active" data-screen="home" aria-label="首頁">
-        <div class="hero">
-          <div class="hero-badge" aria-hidden="true">🗣️</div>
-          <h2>歡迎嚟到！</h2>
-          <p>專為新來港兒童設計嘅廣東話發音練習，聽、讀、揀，一步步愈講愈準。</p>
-        </div>
-
-        <div class="card">
-          <div class="card-title">我的進度</div>
-          <div class="stats-grid">
-            <div class="stat-box">
-              <div class="num" id="stat-words">0</div>
-              <div class="label">練習過詞語</div>
-            </div>
-            <div class="stat-box">
-              <div class="num" id="stat-attempts">0</div>
-              <div class="label">總練習次數</div>
-            </div>
-            <div class="stat-box">
-              <div class="num" id="stat-rate">0%</div>
-              <div class="label">正確率</div>
-            </div>
+      <!-- ===== 登入／註冊 ===== -->
+      <section class="screen" data-screen="auth" aria-label="登入">
+        <div class="auth-wrap">
+          <div class="hero" style="padding-top:8px;">
+            <div class="hero-badge" aria-hidden="true">🗣️</div>
+            <h2 id="auth-title">登入</h2>
+            <p id="auth-desc">電郵＋密碼。演示模式資料存在本機瀏覽器。</p>
           </div>
-          <p class="welcome-note" id="last-session">尚未開始練習——撳下面開始啦！</p>
+
+          <div class="auth-tabs" role="tablist">
+            <button type="button" class="auth-tab active" data-auth-tab="login">登入</button>
+            <button type="button" class="auth-tab" data-auth-tab="register">註冊</button>
+          </div>
+
+          <form id="auth-form" class="card auth-form" autocomplete="on">
+            <label class="field-label" for="auth-email">電郵</label>
+            <input id="auth-email" type="email" class="field-input" placeholder="student@example.com" required />
+
+            <label class="field-label" for="auth-password">密碼</label>
+            <input id="auth-password" type="password" class="field-input" placeholder="至少 4 個字元" required minlength="4" />
+
+            <div id="register-fields" class="hidden">
+              <label class="field-label" for="auth-name">顯示名稱</label>
+              <input id="auth-name" type="text" class="field-input" placeholder="例如：小明" />
+
+              <label class="field-label">角色</label>
+              <div class="role-picker" role="radiogroup" aria-label="選擇角色">
+                <label class="role-chip"><input type="radio" name="auth-role" value="學生" checked /> 學生</label>
+                <label class="role-chip"><input type="radio" name="auth-role" value="家長" /> 家長</label>
+                <label class="role-chip"><input type="radio" name="auth-role" value="言語治療師" /> 言語治療師</label>
+              </div>
+            </div>
+
+            <p class="auth-error hidden" id="auth-error" role="alert"></p>
+            <button type="submit" class="btn btn-primary" id="auth-submit" style="margin-top:12px;">登入</button>
+          </form>
+
+          <p class="welcome-note">Mock 模式：唔使開伺服器都可註冊三種角色試用。<br/>接 Supabase 步驟見 README。</p>
+        </div>
+      </section>
+
+      <!-- ===== 首頁（按角色變） ===== -->
+      <section class="screen" data-screen="home" aria-label="首頁">
+        <div id="home-student">
+          <div class="hero">
+            <div class="hero-badge" aria-hidden="true">🗣️</div>
+            <h2 id="home-greet">歡迎嚟到！</h2>
+            <p>專為新來港兒童設計嘅廣東話發音練習——聽、讀、情景、錄音測驗。</p>
+          </div>
+          <div class="card">
+            <div class="card-title">我的進度</div>
+            <div class="stats-grid">
+              <div class="stat-box"><div class="num" id="stat-words">0</div><div class="label">練習過詞語</div></div>
+              <div class="stat-box"><div class="num" id="stat-attempts">0</div><div class="label">總練習次數</div></div>
+              <div class="stat-box"><div class="num" id="stat-rate">0%</div><div class="label">正確率</div></div>
+            </div>
+            <p class="welcome-note" id="last-session">尚未開始練習</p>
+          </div>
+          <button type="button" class="btn btn-primary" id="btn-start" style="margin-bottom:12px;">▶️ 開始練習</button>
+          <div class="btn-row" style="margin-bottom:12px;">
+            <button type="button" class="btn btn-outline btn-sm" data-go="scenarios">🎬 情景</button>
+            <button type="button" class="btn btn-outline btn-sm" data-go="quiz">🎙️ 測驗</button>
+          </div>
         </div>
 
-        <button type="button" class="btn btn-primary" id="btn-start" style="margin-bottom:12px;">
-          ▶️ 開始練習
-        </button>
+        <div id="home-parent" class="hidden">
+          <p class="section-label">家長儀表板</p>
+          <div class="card">
+            <div class="card-title">連結學生</div>
+            <p class="hint-text">輸入學生嘅<strong>連結碼</strong>或<strong>電郵</strong>（學生可喺「我的」睇到連結碼）。</p>
+            <input id="parent-link-input" type="text" class="field-input" placeholder="連結碼或電郵" />
+            <button type="button" class="btn btn-primary btn-sm" id="btn-parent-link" style="margin-top:8px;width:100%;">連結</button>
+          </div>
+          <div id="parent-students"></div>
+        </div>
+
+        <div id="home-therapist" class="hidden">
+          <p class="section-label">言語治療師儀表板</p>
+          <div class="card">
+            <div class="card-title">加入學生</div>
+            <p class="hint-text">用學生連結碼或電郵連結，之後可睇正確率同做筆記。</p>
+            <input id="therapist-link-input" type="text" class="field-input" placeholder="連結碼或電郵" />
+            <button type="button" class="btn btn-primary btn-sm" id="btn-therapist-link" style="margin-top:8px;width:100%;">連結學生</button>
+          </div>
+          <div id="therapist-students"></div>
+        </div>
+      </section>
+
+      <!-- ===== 練習（目錄＋練習合併入口） ===== -->
+      <section class="screen" data-screen="practice" aria-label="練習">
+        <div id="practice-catalog-view">
+          <p class="section-label">選擇單元開始練習</p>
+          <div class="cat-list" id="catalog-list"></div>
+        </div>
+        <div id="practice-drill-view" class="hidden">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-back-catalog" style="margin-bottom:8px;">← 返回單元</button>
+          <div class="cat-picker">
+            <label for="practice-cat" class="section-label" style="display:block;">練習單元</label>
+            <select id="practice-cat" aria-label="選擇練習單元"></select>
+          </div>
+          <div class="practice-toolbar" role="tablist" aria-label="練習模式">
+            <button type="button" class="mode-chip active" data-mode="listen" role="tab">🔊 聽</button>
+            <button type="button" class="mode-chip" data-mode="read" role="tab">🎤 讀</button>
+            <button type="button" class="mode-chip" data-mode="choice" role="tab">🔤 揀粵拼</button>
+            <button type="button" class="mode-chip" data-mode="tone" role="tab">🎵 聲調</button>
+          </div>
+          <div class="progress-bar-wrap" aria-hidden="true"><div class="progress-bar-fill" id="practice-progress-fill"></div></div>
+          <p class="progress-label" id="practice-progress-label">第 1 / 1 個</p>
+          <div class="practice-card" id="practice-card"></div>
+        </div>
+      </section>
+
+      <!-- ===== 情景 ===== -->
+      <section class="screen" data-screen="scenarios" aria-label="情景">
+        <div id="scenario-list-view">
+          <p class="section-label">揀一個情景練習對話</p>
+          <div class="cat-list" id="scenario-list"></div>
+        </div>
+        <div id="scenario-play-view" class="hidden">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-back-scenarios" style="margin-bottom:8px;">← 返回情景</button>
+          <div class="card" id="scenario-header-card">
+            <div class="card-title" id="scenario-title">情景</div>
+            <p class="hint-text" id="scenario-subtitle"></p>
+          </div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="scenario-progress-fill"></div></div>
+          <p class="progress-label" id="scenario-progress-label"></p>
+          <div class="practice-card" id="scenario-card"></div>
+        </div>
+      </section>
+
+      <!-- ===== 錄音測驗 ===== -->
+      <section class="screen" data-screen="quiz" aria-label="測驗">
+        <div id="quiz-list-view">
+          <p class="section-label">睇文字 · 錄音測驗</p>
+          <p class="hint-text" style="margin-bottom:12px;">顯示句子 → 錄音 → 重播 → 自評檢查表。錄音存在本機 IndexedDB（有容量限制）。</p>
+          <div class="cat-list" id="quiz-list"></div>
+        </div>
+        <div id="quiz-play-view" class="hidden">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-back-quiz" style="margin-bottom:8px;">← 返回列表</button>
+          <div class="practice-card" id="quiz-card"></div>
+        </div>
+      </section>
+
+      <!-- ===== 我的 ===== -->
+      <section class="screen" data-screen="me" aria-label="我的">
+        <div class="card">
+          <div class="card-title">帳戶</div>
+          <p><strong id="me-name">—</strong></p>
+          <p class="hint-text" id="me-email">—</p>
+          <p class="role-badge" id="me-role">—</p>
+          <div id="me-link-code-wrap" class="hidden" style="margin-top:10px;">
+            <p class="hint-text">你的連結碼（畀家長／治療師用）：</p>
+            <div class="link-code" id="me-link-code">————</div>
+          </div>
+        </div>
+
+        <div class="card" id="me-tips-card">
+          <div class="card-title">發音小提示</div>
+          <div id="tips-list"></div>
+        </div>
 
         <div class="card">
-          <div class="card-title">關於本 App</div>
-          <p style="font-size:0.85rem;line-height:1.5;color:var(--text-muted);">
-            由教師設計，針對普通話背景同學常見難點：聲調、ng- 聲母、n-/l-、gw-/kw-、入聲同校園用語。
-            進度保存在本機瀏覽器（localStorage），可匯出 JSON。
-          </p>
+          <div class="card-title">資料</div>
+          <p class="hint-text">Auth 模式：<span id="me-auth-mode">mock</span></p>
           <div class="btn-row">
             <button type="button" class="btn btn-outline btn-sm" id="btn-export">匯出進度</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="btn-reset">清除進度</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-reset">清除我的練習記錄</button>
+          </div>
+          <button type="button" class="btn btn-danger" id="btn-logout" style="margin-top:12px;">登出</button>
+        </div>
+      </section>
+
+      <!-- ===== 學生詳情（治療師／家長） ===== -->
+      <section class="screen" data-screen="student-detail" aria-label="學生詳情">
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-back-home" style="margin-bottom:8px;">← 返回</button>
+        <div class="card">
+          <div class="card-title" id="detail-name">學生</div>
+          <p class="hint-text" id="detail-email"></p>
+          <div class="stats-grid" style="margin-top:8px;">
+            <div class="stat-box"><div class="num" id="detail-total">0</div><div class="label">次數</div></div>
+            <div class="stat-box"><div class="num" id="detail-correct">0</div><div class="label">答對</div></div>
+            <div class="stat-box"><div class="num" id="detail-rate">0%</div><div class="label">正確率</div></div>
           </div>
         </div>
-      </section>
-
-      <!-- 目錄 -->
-      <section class="screen" data-screen="catalog" aria-label="目錄">
-        <p class="section-label">選擇單元開始練習</p>
-        <div class="cat-list" id="catalog-list"></div>
-      </section>
-
-      <!-- 練習 -->
-      <section class="screen" data-screen="practice" aria-label="練習">
-        <div class="cat-picker">
-          <label for="practice-cat" class="section-label" style="display:block;">練習單元</label>
-          <select id="practice-cat" aria-label="選擇練習單元"></select>
+        <div class="card">
+          <div class="card-title">各單元正確率</div>
+          <div id="detail-units"></div>
         </div>
-
-        <div class="practice-toolbar" role="tablist" aria-label="練習模式">
-          <button type="button" class="mode-chip active" data-mode="listen" role="tab">🔊 聽</button>
-          <button type="button" class="mode-chip" data-mode="read" role="tab">🎤 讀</button>
-          <button type="button" class="mode-chip" data-mode="choice" role="tab">🔤 揀粵拼</button>
-          <button type="button" class="mode-chip" data-mode="tone" role="tab">🎵 聲調</button>
+        <div class="card">
+          <div class="card-title">最近練習</div>
+          <div id="detail-recent"></div>
         </div>
-
-        <div class="progress-bar-wrap" aria-hidden="true">
-          <div class="progress-bar-fill" id="practice-progress-fill"></div>
-        </div>
-        <p class="progress-label" id="practice-progress-label">第 1 / 1 個</p>
-
-        <div class="practice-card" id="practice-card"></div>
-      </section>
-
-      <!-- 提示 -->
-      <section class="screen" data-screen="tips" aria-label="提示">
-        <p class="tip-intro">
-          以下提示畀新來港兒童、家長同老師參考——每日小步練習，口音會自然改善。
-        </p>
-        <div id="tips-list"></div>
-        <div class="card" style="margin-top:8px;">
-          <div class="card-title">粵拼小知識</div>
-          <p style="font-size:0.85rem;line-height:1.55;color:var(--text-muted);">
-            粵拼（Jyutping）係語言學會拼音方案。數字 1–6 代表聲調，例如
-            <strong>ngo5</strong>＝「我」（第 5 聲）。入聲字以 -p/-t/-k 結尾，讀音短促。
-          </p>
+        <div class="card" id="detail-notes-card">
+          <div class="card-title">治療師筆記</div>
+          <textarea id="detail-notes" class="field-textarea" rows="4" placeholder="記錄觀察、目標、建議…"></textarea>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-save-note" style="margin-top:8px;width:100%;">儲存筆記</button>
         </div>
       </section>
     </main>
 
-    <nav class="tab-bar" aria-label="主導航">
+    <nav class="tab-bar hidden" id="tab-bar" aria-label="主導航">
       <button type="button" class="tab-btn active" data-screen="home">
-        <span class="tab-icon">🏠</span>
-        <span>首頁</span>
+        <span class="tab-icon">🏠</span><span>首頁</span>
       </button>
-      <button type="button" class="tab-btn" data-screen="catalog">
-        <span class="tab-icon">📚</span>
-        <span>目錄</span>
+      <button type="button" class="tab-btn" data-screen="practice" data-student-only="1">
+        <span class="tab-icon">✏️</span><span>練習</span>
       </button>
-      <button type="button" class="tab-btn" data-screen="practice">
-        <span class="tab-icon">✏️</span>
-        <span>練習</span>
+      <button type="button" class="tab-btn" data-screen="scenarios" data-student-only="1">
+        <span class="tab-icon">🎬</span><span>情景</span>
       </button>
-      <button type="button" class="tab-btn" data-screen="tips">
-        <span class="tab-icon">💡</span>
-        <span>提示</span>
+      <button type="button" class="tab-btn" data-screen="quiz" data-student-only="1">
+        <span class="tab-icon">🎙️</span><span>測驗</span>
+      </button>
+      <button type="button" class="tab-btn" data-screen="me">
+        <span class="tab-icon">👤</span><span>我的</span>
       </button>
     </nav>
   </div>
 
+  <!-- 切換到 supabase 時取消註解下一行 -->
+  <!-- <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script> -->
+  <script src="js/supabase-config.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/db.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
